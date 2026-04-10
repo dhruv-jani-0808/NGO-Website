@@ -1,26 +1,29 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useAppData } from '../context/AppDataContext'
 
 export default function VolunteerDashboard() {
     const { user } = useAuth()
-    const { events, hoursLog, registerForEvent, unregisterFromEvent, logHours } = useAppData()
+    const { events, hoursLog, registerForEvent, unregisterFromEvent, logHours, loadProtectedData } = useAppData()
 
     const [activeTab, setActiveTab] = useState('events')
     const [logForm, setLogForm] = useState({ eventId: '', hours: '', note: '' })
     const [logSuccess, setLogSuccess] = useState(false)
-    const [confirmCancel, setConfirmCancel] = useState(null) // { eventId, eventTitle }
+    const [confirmCancel, setConfirmCancel] = useState(null)
 
-    const myRegistrations = events.filter(ev => ev.registrations.includes(user?.email))
+    useEffect(() => { loadProtectedData() }, [])
+
+    const today = new Date().toISOString().slice(0, 10)
+    const upcomingEvents = events.filter(ev => ev.date >= today)
+    const myRegistrations = upcomingEvents.filter(ev => ev.registrations.includes(user?.email))
     const myHours = hoursLog.filter(h => h.email === user?.email)
     const totalHours = myHours.reduce((s, h) => s + Number(h.hours), 0)
 
-    function handleLogHours(e) {
+    async function handleLogHours(e) {
         e.preventDefault()
         if (!logForm.eventId || !logForm.hours || Number(logForm.hours) <= 0) return
-        const ev = events.find(e => e.id === logForm.eventId)
-        logHours({
-            email: user.email,
+        const ev = events.find(e => e._id === logForm.eventId)
+        await logHours({
             name: user.name,
             eventId: logForm.eventId,
             eventTitle: ev?.title || 'Unknown Event',
@@ -46,45 +49,29 @@ export default function VolunteerDashboard() {
                 <p>Welcome back, {user?.name}! You're making a difference. 🌟</p>
             </div>
 
-            {/* Stats Strip */}
             <div className="vol-stats">
                 <div className="vol-stat-card">
                     <span className="vol-stat-icon">⏱️</span>
-                    <div>
-                        <h3>{totalHours}</h3>
-                        <p>Total Hours Logged</p>
-                    </div>
+                    <div><h3>{totalHours}</h3><p>Total Hours Logged</p></div>
                 </div>
                 <div className="vol-stat-card">
                     <span className="vol-stat-icon">📅</span>
-                    <div>
-                        <h3>{myRegistrations.length}</h3>
-                        <p>Events Registered</p>
-                    </div>
+                    <div><h3>{myRegistrations.length}</h3><p>Events Registered</p></div>
                 </div>
                 <div className="vol-stat-card">
                     <span className="vol-stat-icon">👤</span>
-                    <div>
-                        <h3>{user?.name}</h3>
-                        <p>{user?.email}</p>
-                    </div>
+                    <div><h3>{user?.name}</h3><p>{user?.email}</p></div>
                 </div>
             </div>
 
-            {/* Tab Nav */}
             <div className="dash-tabs">
                 {tabs.map(t => (
-                    <button
-                        key={t.id}
-                        className={`dash-tab ${activeTab === t.id ? 'active' : ''}`}
-                        onClick={() => setActiveTab(t.id)}
-                    >
+                    <button key={t.id} className={`dash-tab ${activeTab === t.id ? 'active' : ''}`} onClick={() => setActiveTab(t.id)}>
                         {t.label}
                     </button>
                 ))}
             </div>
 
-            {/* Confirm Cancel Modal */}
             {confirmCancel && (
                 <div className="modal-overlay">
                     <div className="modal-card" style={{ textAlign: 'center' }}>
@@ -99,10 +86,7 @@ export default function VolunteerDashboard() {
                             <button
                                 className="auth-submit"
                                 style={{ background: 'linear-gradient(135deg,#dc2626,#b91c1c)' }}
-                                onClick={() => {
-                                    unregisterFromEvent(confirmCancel.eventId, user.email)
-                                    setConfirmCancel(null)
-                                }}
+                                onClick={() => { unregisterFromEvent(confirmCancel.eventId, user.email); setConfirmCancel(null) }}
                             >Yes, Cancel</button>
                         </div>
                     </div>
@@ -110,39 +94,28 @@ export default function VolunteerDashboard() {
             )}
 
             <div className="dash-content">
-
-                {/* ── Upcoming Events ── */}
                 {activeTab === 'events' && (
                     <div>
                         <h2 className="dash-section-title">Upcoming Events</h2>
                         <div className="event-cards-grid">
-                            {events.map(ev => {
+                            {upcomingEvents.map(ev => {
                                 const isReg = ev.registrations.includes(user?.email)
                                 const isFull = ev.registrations.length >= ev.slots
                                 return (
-                                    <div className="event-card" key={ev.id}>
+                                    <div className="event-card" key={ev._id}>
                                         <div className={`event-badge ${ev.type}`}>{ev.type === 'drive' ? '🚗 Drive' : '🏕️ Camp'}</div>
                                         <h3>{ev.title}</h3>
                                         <p className="event-meta">📅 {ev.date} &nbsp;|&nbsp; 🕐 {ev.time}</p>
                                         <p className="event-meta">📍 {ev.location}</p>
                                         <p className="event-desc">{ev.description}</p>
                                         <div className="event-footer">
-                                            <span className="event-slots">
-                                                {ev.registrations.length}/{ev.slots} volunteers
-                                            </span>
+                                            <span className="event-slots">{ev.registrations.length}/{ev.slots} volunteers</span>
                                             {isReg ? (
-                                                <button
-                                                    className="ev-btn ev-unreg"
-                                                    onClick={() => setConfirmCancel({ eventId: ev.id, eventTitle: ev.title })}
-                                                >
+                                                <button className="ev-btn ev-unreg" onClick={() => setConfirmCancel({ eventId: ev._id, eventTitle: ev.title })}>
                                                     ✅ Registered — Cancel
                                                 </button>
                                             ) : (
-                                                <button
-                                                    className={`ev-btn ev-reg ${isFull ? 'disabled' : ''}`}
-                                                    disabled={isFull}
-                                                    onClick={() => registerForEvent(ev.id, user.email)}
-                                                >
+                                                <button className={`ev-btn ev-reg ${isFull ? 'disabled' : ''}`} disabled={isFull} onClick={() => registerForEvent(ev._id, user.email)}>
                                                     {isFull ? 'Full' : 'Register →'}
                                                 </button>
                                             )}
@@ -154,7 +127,6 @@ export default function VolunteerDashboard() {
                     </div>
                 )}
 
-                {/* ── My Registrations ── */}
                 {activeTab === 'myevents' && (
                     <div>
                         <h2 className="dash-section-title">My Registered Events</h2>
@@ -167,16 +139,12 @@ export default function VolunteerDashboard() {
                         ) : (
                             <div className="event-cards-grid">
                                 {myRegistrations.map(ev => (
-                                    <div className="event-card reg-card" key={ev.id}>
+                                    <div className="event-card reg-card" key={ev._id}>
                                         <div className={`event-badge ${ev.type}`}>{ev.type === 'drive' ? '🚗 Drive' : '🏕️ Camp'}</div>
                                         <h3>{ev.title}</h3>
                                         <p className="event-meta">📅 {ev.date} &nbsp;|&nbsp; 🕐 {ev.time}</p>
                                         <p className="event-meta">📍 {ev.location}</p>
-                                        <button
-                                            className="ev-btn ev-unreg"
-                                            style={{ marginTop: '0.8rem' }}
-                                            onClick={() => setConfirmCancel({ eventId: ev.id, eventTitle: ev.title })}
-                                        >
+                                        <button className="ev-btn ev-unreg" style={{ marginTop: '0.8rem' }} onClick={() => setConfirmCancel({ eventId: ev._id, eventTitle: ev.title })}>
                                             Cancel Registration
                                         </button>
                                     </div>
@@ -186,78 +154,42 @@ export default function VolunteerDashboard() {
                     </div>
                 )}
 
-                {/* ── Log Hours ── */}
                 {activeTab === 'loghours' && (
                     <div style={{ maxWidth: 520 }}>
                         <h2 className="dash-section-title">Log Your Hours</h2>
                         {logSuccess && <div className="success-toast">✅ Hours logged successfully!</div>}
                         <form className="log-hours-form" onSubmit={handleLogHours}>
                             <label>Select Event</label>
-                            <select
-                                value={logForm.eventId}
-                                onChange={e => setLogForm({ ...logForm, eventId: e.target.value })}
-                                required
-                            >
+                            <select value={logForm.eventId} onChange={e => setLogForm({ ...logForm, eventId: e.target.value })} required>
                                 <option value="">-- Choose an event --</option>
                                 {events.map(ev => (
-                                    <option key={ev.id} value={ev.id}>{ev.title} ({ev.date})</option>
+                                    <option key={ev._id} value={ev._id}>{ev.title} ({ev.date})</option>
                                 ))}
                             </select>
 
                             <label>Hours Worked</label>
-                            <input
-                                type="number"
-                                min="0.5"
-                                step="0.5"
-                                placeholder="e.g. 3.5"
-                                value={logForm.hours}
-                                onChange={e => setLogForm({ ...logForm, hours: e.target.value })}
-                                required
-                            />
+                            <input type="number" min="0.5" step="0.5" placeholder="e.g. 3.5" value={logForm.hours} onChange={e => setLogForm({ ...logForm, hours: e.target.value })} required />
 
                             <label>Note (optional)</label>
-                            <textarea
-                                rows="3"
-                                placeholder="What did you do during this session?"
-                                value={logForm.note}
-                                onChange={e => setLogForm({ ...logForm, note: e.target.value })}
-                            />
+                            <textarea rows="3" placeholder="What did you do during this session?" value={logForm.note} onChange={e => setLogForm({ ...logForm, note: e.target.value })} />
 
                             <button type="submit" className="auth-submit">Submit Hours</button>
                         </form>
                     </div>
                 )}
 
-                {/* ── Hours History ── */}
                 {activeTab === 'history' && (
                     <div>
                         <h2 className="dash-section-title">Hours History <span className="total-badge">Total: {totalHours} hrs</span></h2>
                         {myHours.length === 0 ? (
-                            <div className="empty-state">
-                                <span>⏱️</span>
-                                <p>No hours logged yet. Start contributing!</p>
-                            </div>
+                            <div className="empty-state"><span>⏱️</span><p>No hours logged yet. Start contributing!</p></div>
                         ) : (
                             <div className="table-wrapper">
                                 <table className="dash-table">
-                                    <thead>
-                                        <tr>
-                                            <th>#</th>
-                                            <th>Event</th>
-                                            <th>Hours</th>
-                                            <th>Date</th>
-                                            <th>Note</th>
-                                        </tr>
-                                    </thead>
+                                    <thead><tr><th>#</th><th>Event</th><th>Hours</th><th>Date</th><th>Note</th></tr></thead>
                                     <tbody>
                                         {myHours.map((h, i) => (
-                                            <tr key={h.id}>
-                                                <td>{i + 1}</td>
-                                                <td>{h.eventTitle}</td>
-                                                <td><strong>{h.hours} hrs</strong></td>
-                                                <td>{h.date}</td>
-                                                <td>{h.note || '—'}</td>
-                                            </tr>
+                                            <tr key={h._id}><td>{i + 1}</td><td>{h.eventTitle}</td><td><strong>{h.hours} hrs</strong></td><td>{h.date}</td><td>{h.note || '—'}</td></tr>
                                         ))}
                                     </tbody>
                                 </table>

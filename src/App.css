@@ -1,1 +1,49 @@
 /* NGO App component styles — global page styles are in index.css */
+
+/* ── Pending info box (Donate page step 3) ── */
+.pending-info-box {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 12px;
+  padding: 1.2rem 1.5rem;
+  margin: 1.2rem auto;
+  max-width: 420px;
+  text-align: center;
+  color: #0369a1;
+  line-height: 1.7;
+}
+.pending-info-box p { margin: 0.2rem 0; }
+
+/* ── Donor UPI input on payment page ── */
+.donor-upi-section {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.2rem 1.5rem;
+  margin: 1.2rem 0;
+}
+.donor-upi-label {
+  display: block;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 0.5rem;
+}
+.donor-upi-input {
+  width: 100%;
+  padding: 0.65rem 0.9rem;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  outline: none;
+  box-sizing: border-box;
+}
+.donor-upi-input:focus { border-color: #3b82f6; }
+.upi-hint { font-size: 0.8rem; color: #94a3b8; margin-top: 0.4rem; }
+
+/* ── Request actions (approve/reject buttons row) ── */
+.request-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}

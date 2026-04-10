@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useAppData } from '../context/AppDataContext'
 
@@ -49,7 +50,9 @@ function printReceipt(donation, userName) {
 
 export default function Profile() {
     const { user } = useAuth()
-    const { donations } = useAppData()
+    const { donations, loadProtectedData } = useAppData()
+
+    useEffect(() => { loadProtectedData() }, [])
 
     const myDonations = donations.filter(d => d.email === user?.email)
     const myTotal = myDonations.reduce((s, d) => s + Number(d.amount), 0)
@@ -106,7 +109,7 @@ export default function Profile() {
                                 </thead>
                                 <tbody>
                                     {myDonations.map(d => (
-                                        <tr key={d.id}>
+                                        <tr key={d._id}>
                                             <td><code>{d.receiptNo}</code></td>
                                             <td>{d.cause}</td>
                                             <td><strong className="amount-cell">₹{Number(d.amount).toLocaleString('en-IN')}</strong></td>

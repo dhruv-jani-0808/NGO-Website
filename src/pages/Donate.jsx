@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useAppData } from '../context/AppDataContext'
 
@@ -16,12 +16,15 @@ export default function Donate() {
     const { user } = useAuth()
     const { addDonation } = useAppData()
 
-    // Step: 1 = select cause/amount, 2 = payment, 3 = thank you
+    // step 1 = select cause/amount, 2 = payment, 3 = pending confirmation
     const [step, setStep] = useState(1)
     const [selectedCause, setSelectedCause] = useState('food')
     const [amount, setAmount] = useState('')
     const [custom, setCustom] = useState('')
+    const [upiId, setUpiId] = useState('')
+    const [upiError, setUpiError] = useState('')
     const [copied, setCopied] = useState(false)
+    const [loading, setLoading] = useState(false)
 
     const presets = [100, 250, 500, 1000, 2500]
     const finalAmount = amount || custom
@@ -33,15 +36,27 @@ export default function Donate() {
         setStep(2)
     }
 
-    // Save donation record when moving to Thank You
-    function handlePaymentDone() {
-        addDonation({
-            amount: Number(finalAmount),
-            cause: causeLabel,
-            donor: user?.name,
-            email: user?.email,
-        })
-        setStep(3)
+    async function handlePaymentDone() {
+        if (!upiId.trim()) {
+            setUpiError('Please enter your UPI ID so we can verify your payment.')
+            return
+        }
+        setUpiError('')
+        setLoading(true)
+        try {
+            await addDonation({
+                amount: Number(finalAmount),
+                cause: causeLabel,
+                donor: user?.name,
+                email: user?.email,
+                upiId: upiId.trim(),
+            })
+            setStep(3)
+        } catch (err) {
+            setUpiError(err.message || 'Failed to submit. Please try again.')
+        } finally {
+            setLoading(false)
+        }
     }
 
     function copyUPI() {
@@ -50,30 +65,30 @@ export default function Donate() {
         setTimeout(() => setCopied(false), 2000)
     }
 
-    // ── STEP 3: Thank You ──────────────────────────────────────────────────
+    // ── STEP 3: Pending Confirmation ───────────────────────────────────────
     if (step === 3) {
         return (
             <div className="page-wrapper">
                 <div className="thankyou-page">
-                    <div className="thankyou-icon">🎉</div>
-                    <h2>Thank You, {user?.name}!</h2>
-                    <p>Your donation of <strong>₹{finalAmount}</strong> towards <strong>{causeLabel}</strong> is very precious to us.</p>
-                    <p>A confirmation will be sent to <strong>{user?.email}</strong> shortly.</p>
-                    <p style={{ fontSize: '0.88rem', color: '#94a3b8' }}>Your receipt is saved in your Profile page.</p>
+                    <div className="thankyou-icon">⏳</div>
+                    <h2>Payment Under Review</h2>
+                    <p>
+                        Your donation of <strong>₹{finalAmount}</strong> towards <strong>{causeLabel}</strong> has been submitted.
+                    </p>
+                    <div className="pending-info-box">
+                        <p>📋 Your payment request has been sent to our founders</p>
+                        <p><strong>Dhruv Jani & Dhruvil Gandhi</strong></p>
+                        <p>They will verify your UPI payment and approve it shortly.</p>
+                        <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.5rem' }}>
+                            Once approved, the receipt will appear in your Profile page.
+                        </p>
+                    </div>
                     <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1.5rem', flexWrap: 'wrap' }}>
-                        <button
-                            className="auth-submit"
-                            style={{ maxWidth: 200 }}
-                            onClick={() => { setStep(1); setAmount(''); setCustom('') }}
-                        >
+                        <button className="auth-submit" style={{ maxWidth: 200 }} onClick={() => { setStep(1); setAmount(''); setCustom(''); setUpiId('') }}>
                             Donate Again
                         </button>
-                        <a
-                            href="/profile"
-                            className="auth-submit"
-                            style={{ maxWidth: 220, textDecoration: 'none', display: 'inline-block', textAlign: 'center' }}
-                        >
-                            View My Receipts 🧾
+                        <a href="/profile" className="auth-submit" style={{ maxWidth: 220, textDecoration: 'none', display: 'inline-block', textAlign: 'center' }}>
+                            View My Profile 👤
                         </a>
                     </div>
                 </div>
@@ -91,7 +106,6 @@ export default function Donate() {
                 </div>
 
                 <div className="payment-page">
-                    {/* Order Summary */}
                     <div className="payment-summary">
                         <span className="pay-label">Amount</span>
                         <span className="pay-value amt-highlight">₹{Number(finalAmount).toLocaleString('en-IN')}</span>
@@ -101,30 +115,21 @@ export default function Donate() {
                         <span className="pay-value">{user?.name} ({user?.role})</span>
                     </div>
 
-                    {/* QR Code */}
                     <div className="payment-qr-card">
                         <p className="scan-title">📱 Scan QR Code to Pay</p>
-                        <img
-                            src="/upi_qr.png"
-                            alt="NGO Anand UPI QR Code"
-                            className="qr-image"
-                        />
+                        <img src="/upi_qr.png" alt="NGO Anand UPI QR Code" className="qr-image" />
                         <p className="qr-sub">Scan with any UPI app — PhonePe, Google Pay, Paytm</p>
                     </div>
 
-                    {/* UPI ID */}
                     <div className="payment-upi-card">
                         <p className="scan-title">Or pay using UPI ID</p>
                         <div className="upi-row">
                             <span className="upi-id">{UPI_ID}</span>
-                            <button className="copy-btn" onClick={copyUPI}>
-                                {copied ? '✅ Copied!' : '📋 Copy'}
-                            </button>
+                            <button className="copy-btn" onClick={copyUPI}>{copied ? '✅ Copied!' : '📋 Copy'}</button>
                         </div>
                         <p className="upi-name">Pay to: <strong>{UPI_NAME}</strong></p>
                     </div>
 
-                    {/* Steps */}
                     <div className="payment-steps">
                         <p className="steps-title">How to pay:</p>
                         <ol>
@@ -132,15 +137,28 @@ export default function Donate() {
                             <li>Scan the QR code <strong>or</strong> enter the UPI ID above</li>
                             <li>Enter amount: <strong>₹{finalAmount}</strong></li>
                             <li>Add note: <em>{causeLabel} - NGO Anand</em></li>
-                            <li>Complete the payment and click the button below</li>
+                            <li>Complete the payment, then fill your UPI ID below and click "I Have Paid"</li>
                         </ol>
                     </div>
 
-                    {/* Actions */}
+                    {/* UPI ID input from donor */}
+                    <div className="donor-upi-section">
+                        <label className="donor-upi-label">Your UPI ID (for verification)</label>
+                        <input
+                            className="donor-upi-input"
+                            type="text"
+                            placeholder="e.g. yourname@paytm or 9876543210@upi"
+                            value={upiId}
+                            onChange={e => { setUpiId(e.target.value); setUpiError('') }}
+                        />
+                        {upiError && <p className="auth-error">{upiError}</p>}
+                        <p className="upi-hint">We use this to match and verify your payment before approving.</p>
+                    </div>
+
                     <div className="payment-actions">
                         <button className="back-btn" onClick={() => setStep(1)}>← Go Back</button>
-                        <button className="auth-submit paid-btn" onClick={handlePaymentDone}>
-                            ✅ I Have Paid
+                        <button className="auth-submit paid-btn" onClick={handlePaymentDone} disabled={loading}>
+                            {loading ? 'Submitting…' : '✅ I Have Paid'}
                         </button>
                     </div>
                 </div>
@@ -148,7 +166,7 @@ export default function Donate() {
         )
     }
 
-    // ── STEP 1: Select Cause & Amount ─────────────────────────────────────
+    // ── STEP 1: Select Cause & Amount ──────────────────────────────────────
     return (
         <div className="page-wrapper">
             <div className="page-hero donate-hero">
@@ -157,16 +175,11 @@ export default function Donate() {
             </div>
 
             <div className="donate-layout">
-                {/* Cause Selector */}
                 <section className="donate-section">
                     <h2>Choose a Cause</h2>
                     <div className="cause-grid">
                         {CAUSES.map(c => (
-                            <div
-                                key={c.id}
-                                className={`cause-card ${selectedCause === c.id ? 'selected' : ''}`}
-                                onClick={() => setSelectedCause(c.id)}
-                            >
+                            <div key={c.id} className={`cause-card ${selectedCause === c.id ? 'selected' : ''}`} onClick={() => setSelectedCause(c.id)}>
                                 <span className="cause-icon">{c.icon}</span>
                                 <h3>{c.label}</h3>
                                 <p>{c.desc}</p>
@@ -175,43 +188,22 @@ export default function Donate() {
                     </div>
                 </section>
 
-                {/* Amount Selector */}
                 <section className="donate-section">
                     <h2>Select Amount (₹)</h2>
                     <form onSubmit={handleProceed}>
                         <div className="preset-amounts">
                             {presets.map(p => (
-                                <button
-                                    type="button"
-                                    key={p}
-                                    className={`preset-btn ${amount === String(p) ? 'active' : ''}`}
-                                    onClick={() => { setAmount(String(p)); setCustom('') }}
-                                >
+                                <button type="button" key={p} className={`preset-btn ${amount === String(p) ? 'active' : ''}`} onClick={() => { setAmount(String(p)); setCustom('') }}>
                                     ₹{p.toLocaleString('en-IN')}
                                 </button>
                             ))}
                         </div>
-
                         <div className="custom-amount">
                             <label>Or enter custom amount</label>
-                            <input
-                                type="number"
-                                min="1"
-                                placeholder="₹ Enter amount"
-                                value={custom}
-                                onChange={e => { setCustom(e.target.value); setAmount('') }}
-                            />
+                            <input type="number" min="1" placeholder="₹ Enter amount" value={custom} onChange={e => { setCustom(e.target.value); setAmount('') }} />
                         </div>
-
-                        <p className="donor-name">
-                            Donating as: <strong>{user?.name}</strong> ({user?.role})
-                        </p>
-
-                        <button
-                            type="submit"
-                            className="auth-submit donate-btn"
-                            disabled={!finalAmount || Number(finalAmount) <= 0}
-                        >
+                        <p className="donor-name">Donating as: <strong>{user?.name}</strong> ({user?.role})</p>
+                        <button type="submit" className="auth-submit donate-btn" disabled={!finalAmount || Number(finalAmount) <= 0}>
                             Proceed to Payment →
                         </button>
                     </form>
